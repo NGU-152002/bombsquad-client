@@ -10,7 +10,7 @@ class NetworkManager {
         this.serverUrl = 'https://bombsquad-server-3atj.onrender.com'
         // Network interpolation for smooth movement
         this.remotePlayers = new Map();
-        this.networkUpdateRate = 1000 / 20; // 20 updates per second
+        this.networkUpdateRate = 1000 / 10; // 10 updates per second (optimized for high latency)
         this.lastNetworkUpdate = 0;
         
         // Ping measurement
@@ -19,6 +19,11 @@ class NetworkManager {
         this.maxPingHistory = 5;
         this.pingInterval = null;
         this.lastPingTime = 0;
+        
+        // Message batching for efficiency
+        this.messageBatch = [];
+        this.batchTimeout = null;
+        this.batchDelay = 100; // ms - batch messages for 100ms
     }
     
     connect(serverUrl = null) {
@@ -189,7 +194,8 @@ class NetworkManager {
         const now = Date.now();
         if (now - this.lastNetworkUpdate < this.networkUpdateRate) return;
         
-        this.socket.emit('playerMove', { x, y });
+        // Use batching for movement updates to reduce network traffic
+        this.batchMessage('playerMove', { x, y });
         this.lastNetworkUpdate = now;
     }
     
@@ -203,6 +209,54 @@ class NetworkManager {
         if (!this.isConnected || !this.roomId) return;
         
         this.socket.emit('collectPowerUp', { powerUpId });
+    }
+    
+    batchMessage(eventType, data) {
+        // Add message to batch
+        this.messageBatch.push({ event: eventType, data: data, timestamp: Date.now() });
+        
+        // Clear existing timeout
+        if (this.batchTimeout) {
+            clearTimeout(this.batchTimeout);
+        }
+        
+        // Set new timeout to send batch
+        this.batchTimeout = setTimeout(() => {
+            this.sendBatch();
+        }, this.batchDelay);
+    }
+    
+    sendBatch() {
+        if (this.messageBatch.length === 0) return;
+        
+        // Group messages by type for more efficient processing
+        const groupedMessages = {};
+        this.messageBatch.forEach(message => {
+            if (!groupedMessages[message.event]) {
+                groupedMessages[message.event] = [];
+            }
+            groupedMessages[message.event].push(message.data);
+        });
+        
+        // Send grouped messages
+        Object.keys(groupedMessages).forEach(eventType => {
+            const messages = groupedMessages[eventType];
+            
+            if (eventType === 'playerMove' && messages.length > 1) {
+                // For movement, only send the latest position
+                const latestMove = messages[messages.length - 1];
+                this.socket.emit(eventType, latestMove);
+            } else {
+                // For other events, send all
+                messages.forEach(data => {
+                    this.socket.emit(eventType, data);
+                });
+            }
+        });
+        
+        // Clear batch
+        this.messageBatch = [];
+        this.batchTimeout = null;
     }
     
     handlePlayerMovement(data) {
@@ -231,10 +285,29 @@ class NetworkManager {
             const player = gameScene.getPlayerById(playerId);
             if (!player || !player.sprite) continue;
             
-            // Simple linear interpolation
+            // Enhanced interpolation with ping-based adaptation
             const timeSinceUpdate = now - remotePlayer.lastUpdate;
-            if (timeSinceUpdate < 1000) { // Only interpolate if update is recent
-                const lerpFactor = 0.15; // Smoothness factor
+            if (timeSinceUpdate < 2000) { // Extended timeout for high latency
+                // Adaptive interpolation based on ping
+                let lerpFactor = 0.15; // Base smoothness factor
+                
+                // Adjust interpolation based on current ping
+                if (this.ping > 200) {
+                    lerpFactor = 0.25; // Faster interpolation for high ping
+                } else if (this.ping > 100) {
+                    lerpFactor = 0.20; // Medium interpolation
+                }
+                
+                // Calculate distance for smoother movement
+                const distance = Math.sqrt(
+                    Math.pow(remotePlayer.targetX - player.sprite.x, 2) + 
+                    Math.pow(remotePlayer.targetY - player.sprite.y, 2)
+                );
+                
+                // Use faster interpolation for larger distances (catching up)
+                if (distance > 50) {
+                    lerpFactor = Math.min(lerpFactor * 2, 0.5);
+                }
                 
                 player.sprite.x += (remotePlayer.targetX - player.sprite.x) * lerpFactor;
                 player.sprite.y += (remotePlayer.targetY - player.sprite.y) * lerpFactor;
@@ -243,11 +316,21 @@ class NetworkManager {
                 if (player.playerText) {
                     player.playerText.setPosition(player.sprite.x, player.sprite.y);
                 }
+                
+                // Update name text position
+                if (player.nameText) {
+                    player.nameText.setPosition(player.sprite.x, player.sprite.y - 45);
+                }
             }
         }
     }
     
     disconnect() {
+        // Send any remaining batched messages before disconnecting
+        if (this.messageBatch.length > 0) {
+            this.sendBatch();
+        }
+        
         if (this.socket) {
             this.socket.disconnect();
             this.socket = null;
@@ -256,11 +339,18 @@ class NetworkManager {
         // Stop ping measurement
         this.stopPingMeasurement();
         
+        // Clear batch timeout
+        if (this.batchTimeout) {
+            clearTimeout(this.batchTimeout);
+            this.batchTimeout = null;
+        }
+        
         this.isConnected = false;
         this.playerId = null;
         this.roomId = null;
         this.isHost = false;
         this.remotePlayers.clear();
+        this.messageBatch = [];
     }
     
     // Ping measurement methods
@@ -269,7 +359,7 @@ class NetworkManager {
         
         this.pingInterval = setInterval(() => {
             this.sendPing();
-        }, 2000); // Send ping every 2 seconds
+        }, 5000); // Send ping every 5 seconds (optimized for high latency)
     }
     
     stopPingMeasurement() {
@@ -297,6 +387,30 @@ class NetworkManager {
         // Calculate average ping
         const sum = this.pingHistory.reduce((a, b) => a + b, 0);
         this.ping = Math.round(sum / this.pingHistory.length);
+        
+        // Adaptive network update rate based on ping
+        this.adaptNetworkRates();
+    }
+    
+    adaptNetworkRates() {
+        // Adjust network update rates based on current ping
+        if (this.ping > 300) {
+            // Very high ping: reduce to 5 FPS
+            this.networkUpdateRate = 1000 / 5;
+            this.batchDelay = 200; // Longer batching
+        } else if (this.ping > 200) {
+            // High ping: reduce to 8 FPS
+            this.networkUpdateRate = 1000 / 8;
+            this.batchDelay = 150; // Medium batching
+        } else if (this.ping > 100) {
+            // Medium ping: 10 FPS (default)
+            this.networkUpdateRate = 1000 / 10;
+            this.batchDelay = 100; // Standard batching
+        } else {
+            // Low ping: can handle higher rate
+            this.networkUpdateRate = 1000 / 12;
+            this.batchDelay = 75; // Faster batching
+        }
     }
     
     getPing() {

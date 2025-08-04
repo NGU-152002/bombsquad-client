@@ -4,7 +4,7 @@ class MultiplayerPlayer {
         this.playerId = playerId;
         this.isLocal = isLocal;
         this.maxHealth = 100;
-        this.networkUpdateRate = 1000 / 20; // 20 updates per second
+        this.networkUpdateRate = 1000 / 10; // 10 updates per second (optimized for high latency)
         this.lastNetworkUpdate = 0;
         
         // Initialize from server data
@@ -63,6 +63,18 @@ class MultiplayerPlayer {
         // Target position for smooth interpolation (remote players)
         this.targetX = x;
         this.targetY = y;
+        
+        // Client-side prediction for local player
+        this.predictedX = x;
+        this.predictedY = y;
+        this.serverX = x;
+        this.serverY = y;
+        this.predictionEnabled = isLocal;
+        
+        // Input buffering for network delays
+        this.inputBuffer = [];
+        this.maxBufferSize = 10;
+        this.bufferProcessDelay = 50; // ms
     }
     
     setupControls() {
@@ -117,7 +129,7 @@ class MultiplayerPlayer {
     }
     
     handleLocalMovement() {
-        // Handle movement
+        // Handle movement with client-side prediction
         let velocityX = 0;
         let velocityY = 0;
         
@@ -133,7 +145,18 @@ class MultiplayerPlayer {
             velocityY = this.speed * this.powerUps.speed;
         }
         
-        this.sprite.setVelocity(velocityX, velocityY);
+        // Apply client-side prediction for immediate responsiveness
+        if (this.predictionEnabled && (velocityX !== 0 || velocityY !== 0)) {
+            const deltaTime = this.scene.game.loop.delta / 1000;
+            this.predictedX += velocityX * deltaTime;
+            this.predictedY += velocityY * deltaTime;
+            
+            // Apply predicted position immediately for visual feedback
+            this.sprite.x = this.predictedX;
+            this.sprite.y = this.predictedY;
+        } else {
+            this.sprite.setVelocity(velocityX, velocityY);
+        }
         
         // Bounds checking - keep player within game boundaries
         const bounds = this.scene.game.config;
@@ -141,22 +164,26 @@ class MultiplayerPlayer {
         
         if (this.sprite.x < margin) {
             this.sprite.x = margin;
+            this.predictedX = margin;
         } else if (this.sprite.x > bounds.width - margin) {
             this.sprite.x = bounds.width - margin;
+            this.predictedX = bounds.width - margin;
         }
         
         if (this.sprite.y < margin) {
             this.sprite.y = margin;
+            this.predictedY = margin;
         } else if (this.sprite.y > bounds.height - margin) {
             this.sprite.y = bounds.height - margin;
+            this.predictedY = bounds.height - margin;
         }
         
-        // Send position to server
+        // Send position to server (throttled)
         this.sendMovementToServer();
         
-        // Handle bomb placement
+        // Handle bomb placement with input buffering
         if (Phaser.Input.Keyboard.JustDown(this.keys.bomb) || Phaser.Input.Keyboard.JustDown(this.keys.bomb2)) {
-            this.placeBomb();
+            this.bufferInput('bomb', { x: this.sprite.x, y: this.sprite.y });
         }
     }
     
@@ -180,12 +207,53 @@ class MultiplayerPlayer {
         }
     }
     
-    placeBomb() {
+    bufferInput(inputType, data) {
+        // Add input to buffer with timestamp
+        const input = {
+            type: inputType,
+            data: data,
+            timestamp: Date.now()
+        };
+        
+        this.inputBuffer.push(input);
+        
+        // Limit buffer size
+        if (this.inputBuffer.length > this.maxBufferSize) {
+            this.inputBuffer.shift();
+        }
+        
+        // Process buffered input after delay to batch with network updates
+        this.scene.time.delayedCall(this.bufferProcessDelay, () => {
+            this.processBufferedInputs();
+        });
+    }
+    
+    processBufferedInputs() {
+        if (this.inputBuffer.length === 0) return;
+        
+        // Process all buffered inputs
+        this.inputBuffer.forEach(input => {
+            switch (input.type) {
+                case 'bomb':
+                    this.placeBomb(input.data.x, input.data.y);
+                    break;
+            }
+        });
+        
+        // Clear processed inputs
+        this.inputBuffer = [];
+    }
+    
+    placeBomb(x = null, y = null) {
         if (this.bombCount >= this.bombCapacity) return;
+        
+        // Use provided coordinates or current sprite position
+        const bombX = x !== null ? x : this.sprite.x;
+        const bombY = y !== null ? y : this.sprite.y;
         
         // Send bomb placement to server
         if (networkManager && networkManager.isConnected) {
-            networkManager.placeBomb(this.sprite.x, this.sprite.y);
+            networkManager.placeBomb(bombX, bombY);
         }
     }
     
@@ -198,10 +266,30 @@ class MultiplayerPlayer {
         this.bombPower = serverData.bombPower;
         this.powerUps = serverData.powerUps;
         
-        // Update position for remote players
+        // Update position handling
         if (!this.isLocal) {
+            // Remote players: smooth interpolation
             this.targetX = serverData.x;
             this.targetY = serverData.y;
+        } else {
+            // Local player: server reconciliation for prediction correction
+            this.serverX = serverData.x;
+            this.serverY = serverData.y;
+            
+            // Check if prediction needs correction (significant difference)
+            const predictionError = Math.sqrt(
+                Math.pow(this.predictedX - this.serverX, 2) + 
+                Math.pow(this.predictedY - this.serverY, 2)
+            );
+            
+            // If prediction error is significant, smoothly correct it
+            if (predictionError > 20) {
+                const correctionFactor = 0.3;
+                this.predictedX += (this.serverX - this.predictedX) * correctionFactor;
+                this.predictedY += (this.serverY - this.predictedY) * correctionFactor;
+                this.sprite.x = this.predictedX;
+                this.sprite.y = this.predictedY;
+            }
         }
         
         // Update visual state

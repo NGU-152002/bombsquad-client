@@ -283,6 +283,9 @@ function setupNetworkEvents() {
             }
         });
         
+        // Update health bars and bomb counts in UI
+        updatePlayerHealthAndBombs(data.players);
+        
         // Remove destroyed blocks
         if (data.destroyedBlocks) {
             data.destroyedBlocks.forEach(destroyedBlock => {
