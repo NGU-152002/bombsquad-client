@@ -204,12 +204,20 @@ function setupNetworkEvents() {
         localPlayerId = data.playerId;
         yourPlayerIdElement.textContent = localPlayerId;
         
-        // Check if game is already playing
+        // Update network status based on current game state
         if (data.gameState && data.gameState.gameState === 'playing') {
             console.log('Game already in progress, setting to playing state');
             gameState = 'playing';
             connectionOverlay.style.display = 'none';
             networkStatus.textContent = 'Playing';
+            networkStatus.style.color = '#2ecc71';
+        } else if (data.gameState && data.gameState.gameState === 'waiting') {
+            console.log('Game waiting for more players');
+            gameState = 'waiting';
+            networkStatus.textContent = 'Waiting for players';
+            networkStatus.style.color = '#f39c12';
+        } else {
+            networkStatus.textContent = 'Connected';
             networkStatus.style.color = '#2ecc71';
         }
         
@@ -231,15 +239,37 @@ function setupNetworkEvents() {
     
     // Handle game state updates (for synchronization)
     networkManager.onGameStateUpdate = (data) => {
-        console.log('Game state update received');
+        console.log('Game state update received:', data.gameState);
+        
+        // Update game state if needed
         if (data.gameState === 'playing' && gameState !== 'playing') {
+            console.log('Synchronizing game state to playing');
             gameState = 'playing';
             connectionOverlay.style.display = 'none';
             networkStatus.textContent = 'Playing';
             networkStatus.style.color = '#2ecc71';
+            
+            // Start ping measurement if not already started
+            if (!networkManager.pingInterval) {
+                networkManager.startPingMeasurement();
+            }
+        } else if (data.gameState === 'waiting' && gameState !== 'waiting') {
+            console.log('Synchronizing game state to waiting');
+            gameState = 'waiting';
+            networkStatus.textContent = 'Waiting for players';
+            networkStatus.style.color = '#f39c12';
         }
-        updatePlayerStats(data.players);
-        updatePlayerHealthAndBombs(data.players);
+        
+        // Update player data
+        if (data.players) {
+            updatePlayerStats(data.players);
+            updatePlayerHealthAndBombs(data.players);
+        }
+        
+        // Update round timer
+        if (data.roundTimer !== undefined) {
+            roundTimer = data.roundTimer;
+        }
     };
     
     // Player events
@@ -247,6 +277,17 @@ function setupNetworkEvents() {
         console.log('Player joined game:', data.player.name);
         addPlayer(data.player);
         updatePlayerStats(data.gameState.players);
+        
+        // Update network status based on game state
+        if (data.gameState.gameState === 'playing') {
+            networkStatus.textContent = 'Playing';
+            networkStatus.style.color = '#2ecc71';
+            gameState = 'playing';
+        } else if (data.gameState.gameState === 'waiting') {
+            networkStatus.textContent = 'Waiting for players';
+            networkStatus.style.color = '#f39c12';
+            gameState = 'waiting';
+        }
     };
     
     networkManager.onPlayerLeft = (data) => {
@@ -382,10 +423,18 @@ function setupNetworkEvents() {
     
     networkManager.onDisconnected = () => {
         console.log('Disconnected from multiplayer server');
-        connectionMessage.textContent = 'Disconnected from server';
-        networkStatus.textContent = 'Disconnected';
-        networkStatus.style.color = '#e74c3c';
+        connectionMessage.textContent = 'Disconnected from server. Attempting to reconnect...';
+        networkStatus.textContent = 'Reconnecting';
+        networkStatus.style.color = '#f39c12';
         gameState = 'disconnected';
+        
+        // Attempt to reconnect after a short delay
+        setTimeout(() => {
+            if (gameState === 'disconnected') {
+                console.log('Attempting to reconnect...');
+                connectToMultiplayerGame();
+            }
+        }, 3000);
     };
 }
 
