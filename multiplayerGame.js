@@ -29,6 +29,7 @@ let multiplayerDestructibleBlocks = [];
 let gameState = 'connecting';
 let localPlayerId = null;
 let roundTimer = 120;
+let isConnecting = false; // Prevent multiple connection attempts
 
 // Connection overlay elements
 const connectionOverlay = document.getElementById('connection-overlay');
@@ -201,6 +202,7 @@ function setupNetworkEvents() {
     // Game state events
     networkManager.onRoomJoined = (data) => {
         console.log('Joined multiplayer game');
+        isConnecting = false; // Reset connection flag on successful join
         localPlayerId = data.playerId;
         yourPlayerIdElement.textContent = localPlayerId;
         
@@ -429,6 +431,13 @@ function setupNetworkEvents() {
 }
 
 async function connectToMultiplayerGame() {
+    if (isConnecting) {
+        console.log('[DEBUG] Connection already in progress, ignoring duplicate call');
+        return;
+    }
+    
+    isConnecting = true;
+    
     try {
         connectionMessage.textContent = 'Connecting to server...';
         
@@ -494,6 +503,7 @@ async function connectToMultiplayerGame() {
         networkManager.joinRoom(roomId, playerName);
         
     } catch (error) {
+        isConnecting = false; // Reset flag on error
         console.error('Failed to connect to multiplayer game:', error);
         connectionMessage.textContent = 'Failed to connect. Returning to lobby...';
         

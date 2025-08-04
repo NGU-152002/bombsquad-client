@@ -5,6 +5,7 @@ class NetworkManager {
         this.playerId = null;
         this.roomId = null;
         this.isHost = false;
+        this.hasJoinedRoom = false; // Track if we've already joined a room
         this.gameScene = null;
         // this.serverUrl = 'https://your-bombsquad-server.herokuapp.com'; // Change this to your deployed server URL
         this.serverUrl = 'https://bombsquad-server-3atj.onrender.com'
@@ -182,7 +183,17 @@ class NetworkManager {
             return;
         }
         
+        // Prevent duplicate room joins
+        if (this.hasJoinedRoom && this.roomId === roomId) {
+            console.log('Already joined room', roomId, 'ignoring duplicate join attempt');
+            return;
+        }
+        
+        console.log('[DEBUG] Joining room:', roomId, 'hasJoinedRoom:', this.hasJoinedRoom);
+        
         this.roomId = roomId;
+        this.hasJoinedRoom = true;
+        
         // Critical event - send immediately, do NOT batch
         this.socket.emit('joinRoom', {
             roomId: roomId,
@@ -353,6 +364,7 @@ class NetworkManager {
         this.playerId = null;
         this.roomId = null;
         this.isHost = false;
+        this.hasJoinedRoom = false; // Reset room join state
         this.remotePlayers.clear();
         this.messageBatch = [];
     }
