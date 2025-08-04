@@ -13,7 +13,7 @@ class MultiplayerPlayer {
         this.bombCapacity = playerData.bombCapacity || 1;
         this.bombCount = playerData.bombCount || 0;
         this.bombPower = playerData.bombPower || 5;
-        this.speed = 70; // Increased to 70 for much faster movement
+        this.speed = 140; // 2x speed increase (70 * 2 = 140) for much faster movement
         this.invulnerable = false;
         this.invulnerabilityTime = 1000;
         
