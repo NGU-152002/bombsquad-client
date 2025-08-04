@@ -11,7 +11,7 @@ class NetworkManager {
         this.serverUrl = 'https://bombsquad-server-3atj.onrender.com'
         // Network interpolation for smooth movement
         this.remotePlayers = new Map();
-        this.networkUpdateRate = 1000 / 10; // 10 updates per second (optimized for high latency)
+        this.networkUpdateRate = 1000 / 20; // 20 updates per second for better responsiveness
         this.lastNetworkUpdate = 0;
         
         // Ping measurement

@@ -4,7 +4,7 @@ class MultiplayerPlayer {
         this.playerId = playerId;
         this.isLocal = isLocal;
         this.maxHealth = 100;
-        this.networkUpdateRate = 1000 / 12; // 12 updates per second (better responsiveness while still optimized)
+        this.networkUpdateRate = 1000 / 20; // 20 updates per second for better responsiveness
         this.lastNetworkUpdate = 0;
         
         // Initialize from server data
@@ -13,7 +13,7 @@ class MultiplayerPlayer {
         this.bombCapacity = playerData.bombCapacity || 1;
         this.bombCount = playerData.bombCount || 0;
         this.bombPower = playerData.bombPower || 5;
-        this.speed = 35; // Increased from 20 to compensate for network optimization delays
+        this.speed = 70; // Increased to 70 for much faster movement
         this.invulnerable = false;
         this.invulnerabilityTime = 1000;
         
