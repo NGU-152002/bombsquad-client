@@ -355,7 +355,27 @@ function setupNetworkEvents() {
     // Error handling
     networkManager.onError = (data) => {
         console.error('Network error:', data.message);
-        connectionMessage.textContent = `Error: ${data.message}`;
+        
+        // Handle specific error cases
+        if (data.message === 'Room not found') {
+            connectionMessage.textContent = 'Room not found. Creating new room...';
+            // Clear invalid room data
+            localStorage.removeItem('bombsquad_roomId');
+            localStorage.removeItem('bombsquad_session');
+            
+            // Redirect to lobby after a delay
+            setTimeout(() => {
+                window.location.href = 'lobby.html';
+            }, 2000);
+        } else if (data.message === 'Room is full') {
+            connectionMessage.textContent = 'Room is full. Returning to lobby...';
+            setTimeout(() => {
+                window.location.href = 'lobby.html';
+            }, 2000);
+        } else {
+            connectionMessage.textContent = `Error: ${data.message}`;
+        }
+        
         networkStatus.textContent = 'Error';
         networkStatus.style.color = '#e74c3c';
     };
@@ -383,6 +403,14 @@ async function connectToMultiplayerGame() {
                 throw new Error('No room ID provided in URL or localStorage');
             }
             console.log('Using room ID from localStorage:', roomId);
+        }
+        
+        // Validate room ID format (should start with 'room_')
+        if (!roomId.startsWith('room_')) {
+            console.warn('Invalid room ID format:', roomId);
+            localStorage.removeItem('bombsquad_roomId');
+            localStorage.removeItem('bombsquad_session');
+            throw new Error('Invalid room ID format. Redirecting to lobby...');
         }
         
         // Try to restore session data
