@@ -218,6 +218,9 @@ function setupNetworkEvents() {
             networkStatus.style.color = '#f39c12';
         }
         
+        // Start ping measurement as soon as we join
+        networkManager.startPingMeasurement();
+        
         initializeGameState(data.gameState);
     };
     

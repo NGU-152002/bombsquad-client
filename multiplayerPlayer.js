@@ -4,7 +4,7 @@ class MultiplayerPlayer {
         this.playerId = playerId;
         this.isLocal = isLocal;
         this.maxHealth = 100;
-        this.networkUpdateRate = 1000 / 10; // 10 updates per second (optimized for high latency)
+        this.networkUpdateRate = 1000 / 12; // 12 updates per second (better responsiveness while still optimized)
         this.lastNetworkUpdate = 0;
         
         // Initialize from server data
@@ -13,7 +13,7 @@ class MultiplayerPlayer {
         this.bombCapacity = playerData.bombCapacity || 1;
         this.bombCount = playerData.bombCount || 0;
         this.bombPower = playerData.bombPower || 5;
-        this.speed = 20;
+        this.speed = 35; // Increased from 20 to compensate for network optimization delays
         this.invulnerable = false;
         this.invulnerabilityTime = 1000;
         
@@ -146,7 +146,7 @@ class MultiplayerPlayer {
         }
         
         // Apply client-side prediction for immediate responsiveness
-        if (this.predictionEnabled && (velocityX !== 0 || velocityY !== 0)) {
+        if (this.predictionEnabled) {
             const deltaTime = this.scene.game.loop.delta / 1000;
             this.predictedX += velocityX * deltaTime;
             this.predictedY += velocityY * deltaTime;
@@ -155,6 +155,7 @@ class MultiplayerPlayer {
             this.sprite.x = this.predictedX;
             this.sprite.y = this.predictedY;
         } else {
+            // Fallback to physics-based movement
             this.sprite.setVelocity(velocityX, velocityY);
         }
         
@@ -283,8 +284,8 @@ class MultiplayerPlayer {
             );
             
             // If prediction error is significant, smoothly correct it
-            if (predictionError > 20) {
-                const correctionFactor = 0.3;
+            if (predictionError > 30) { // Increased threshold for smoother movement
+                const correctionFactor = 0.2; // Reduced correction factor for gentler adjustment
                 this.predictedX += (this.serverX - this.predictedX) * correctionFactor;
                 this.predictedY += (this.serverY - this.predictedY) * correctionFactor;
                 this.sprite.x = this.predictedX;
