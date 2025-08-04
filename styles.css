@@ -119,6 +119,42 @@ body {
     border: 2px solid #e74c3c;
 }
 
+.network-status {
+    background: rgba(0, 0, 0, 0.7);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    border: 2px solid #3498db;
+}
+
+.ping-display {
+    background: rgba(0, 0, 0, 0.7);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    border: 2px solid #2ecc71;
+    transition: border-color 0.3s ease;
+}
+
+.ping-display.ping-good {
+    border-color: #2ecc71; /* Green: < 50ms */
+}
+
+.ping-display.ping-fair {
+    border-color: #f39c12; /* Yellow: 50-100ms */
+}
+
+.ping-display.ping-poor {
+    border-color: #e67e22; /* Orange: 100-200ms */
+}
+
+.ping-display.ping-bad {
+    border-color: #e74c3c; /* Red: > 200ms */
+}
+
 /* Controls Info */
 .controls-info {
     position: absolute;

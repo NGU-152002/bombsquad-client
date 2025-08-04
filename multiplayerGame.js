@@ -36,6 +36,7 @@ const connectionMessage = document.getElementById('connection-message');
 const gameOverOverlay = document.getElementById('game-over-overlay');
 const networkStatus = document.getElementById('network-status');
 const yourPlayerIdElement = document.getElementById('your-player-id');
+const pingDisplay = document.getElementById('ping-display');
 
 // Initialize the multiplayer game
 function initMultiplayerGame() {
@@ -84,6 +85,27 @@ function multiplayerCreate() {
 function multiplayerUpdate(time, delta) {
     if (gameState !== 'playing') return;
     
+    // Update round timer
+    roundTimer -= delta / 1000;
+    if (roundTimer <= 0) {
+        roundTimer = 0;
+        gameState = 'finished';
+        
+        // Determine winner based on remaining players
+        const alivePlayers = Array.from(multiplayerPlayers.values()).filter(p => p.isAlive);
+        let winner = alivePlayers.length === 1 ? alivePlayers[0] : null;
+        
+        // Show game over
+        const gameOverOverlay = document.getElementById('game-over-overlay');
+        const winnerText = document.getElementById('winner-text');
+        if (gameOverOverlay && winnerText) {
+            winnerText.textContent = winner ? `${winner.playerData?.name || `Player ${winner.playerId}`} Wins!` : 'Time Up - Draw!';
+            gameOverOverlay.style.display = 'flex';
+        }
+        
+        return;
+    }
+    
     // Update players with error recovery
     if (multiplayerPlayers.size > 0) {
         try {
@@ -112,8 +134,11 @@ function multiplayerUpdate(time, delta) {
         networkManager.interpolateRemotePlayers(multiplayerGameScene);
     }
     
-    // Update round timer
+    // Update round timer display
     updateMultiplayerRoundTimer();
+    
+    // Update ping display
+    updatePingDisplay();
 }
 
 function createMultiplayerArena(scene) {
@@ -197,6 +222,9 @@ function setupNetworkEvents() {
         connectionOverlay.style.display = 'none';
         networkStatus.textContent = 'Playing';
         networkStatus.style.color = '#2ecc71';
+        
+        // Start ping measurement
+        networkManager.startPingMeasurement();
         
         initializeGameState(data);
     };
@@ -537,6 +565,27 @@ function updateMultiplayerRoundTimer() {
         }
     } catch (error) {
         console.warn('Failed to update round timer:', error);
+    }
+}
+
+function updatePingDisplay() {
+    if (!pingDisplay || !networkManager) return;
+    
+    const ping = networkManager.getPing();
+    pingDisplay.textContent = `Ping: ${ping}ms`;
+    
+    // Remove all ping classes
+    pingDisplay.classList.remove('ping-good', 'ping-fair', 'ping-poor', 'ping-bad');
+    
+    // Add appropriate class based on ping
+    if (ping < 50) {
+        pingDisplay.classList.add('ping-good');
+    } else if (ping < 100) {
+        pingDisplay.classList.add('ping-fair');
+    } else if (ping < 200) {
+        pingDisplay.classList.add('ping-poor');
+    } else {
+        pingDisplay.classList.add('ping-bad');
     }
 }
 

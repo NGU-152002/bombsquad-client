@@ -12,7 +12,7 @@ class MultiplayerPlayer {
         this.isAlive = playerData.isAlive !== undefined ? playerData.isAlive : true;
         this.bombCapacity = playerData.bombCapacity || 1;
         this.bombCount = playerData.bombCount || 0;
-        this.bombPower = playerData.bombPower || 3;
+        this.bombPower = playerData.bombPower || 5;
         this.speed = 20;
         this.invulnerable = false;
         this.invulnerabilityTime = 1000;

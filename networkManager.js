@@ -6,13 +6,19 @@ class NetworkManager {
         this.roomId = null;
         this.isHost = false;
         this.gameScene = null;
-        // Default to production server, fallback to localhost for development
-        this.serverUrl = 'https://bombsquad-server-3atj.onrender.com' // Change this to your deployed server URL
-        // this.serverUrl = 'http://localhost:3000' // Uncomment for local development
+        // this.serverUrl = 'https://your-bombsquad-server.herokuapp.com'; // Change this to your deployed server URL
+        this.serverUrl = 'https://bombsquad-server-3atj.onrender.com'
         // Network interpolation for smooth movement
         this.remotePlayers = new Map();
         this.networkUpdateRate = 1000 / 20; // 20 updates per second
         this.lastNetworkUpdate = 0;
+        
+        // Ping measurement
+        this.ping = 0;
+        this.pingHistory = [];
+        this.maxPingHistory = 5;
+        this.pingInterval = null;
+        this.lastPingTime = 0;
     }
     
     connect(serverUrl = null) {
@@ -124,6 +130,13 @@ class NetworkManager {
             if (this.onGameStateUpdate) {
                 this.onGameStateUpdate(data);
             }
+        });
+        
+        // Ping measurement events
+        this.socket.on('pong', (data) => {
+            const currentTime = Date.now();
+            const pingTime = currentTime - data.timestamp;
+            this.updatePing(pingTime);
         });
         
         // Error handling
@@ -240,11 +253,54 @@ class NetworkManager {
             this.socket = null;
         }
         
+        // Stop ping measurement
+        this.stopPingMeasurement();
+        
         this.isConnected = false;
         this.playerId = null;
         this.roomId = null;
         this.isHost = false;
         this.remotePlayers.clear();
+    }
+    
+    // Ping measurement methods
+    startPingMeasurement() {
+        if (this.pingInterval) return;
+        
+        this.pingInterval = setInterval(() => {
+            this.sendPing();
+        }, 2000); // Send ping every 2 seconds
+    }
+    
+    stopPingMeasurement() {
+        if (this.pingInterval) {
+            clearInterval(this.pingInterval);
+            this.pingInterval = null;
+        }
+    }
+    
+    sendPing() {
+        if (!this.isConnected || !this.socket) return;
+        
+        const timestamp = Date.now();
+        this.lastPingTime = timestamp;
+        this.socket.emit('ping', { timestamp });
+    }
+    
+    updatePing(pingTime) {
+        // Add to history
+        this.pingHistory.push(pingTime);
+        if (this.pingHistory.length > this.maxPingHistory) {
+            this.pingHistory.shift();
+        }
+        
+        // Calculate average ping
+        const sum = this.pingHistory.reduce((a, b) => a + b, 0);
+        this.ping = Math.round(sum / this.pingHistory.length);
+    }
+    
+    getPing() {
+        return this.ping;
     }
     
     // Event callback setters
