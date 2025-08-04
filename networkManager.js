@@ -169,6 +169,7 @@ class NetworkManager {
             return;
         }
         
+        // Critical event - send immediately, do NOT batch
         this.socket.emit('createRoom', {
             name: playerName,
             maxPlayers: maxPlayers
@@ -182,6 +183,7 @@ class NetworkManager {
         }
         
         this.roomId = roomId;
+        // Critical event - send immediately, do NOT batch
         this.socket.emit('joinRoom', {
             roomId: roomId,
             name: playerName
@@ -202,12 +204,14 @@ class NetworkManager {
     placeBomb(x, y) {
         if (!this.isConnected || !this.roomId) return;
         
+        // Critical game event - send immediately, do NOT batch
         this.socket.emit('placeBomb', { x, y });
     }
     
     collectPowerUp(powerUpId) {
         if (!this.isConnected || !this.roomId) return;
         
+        // Critical game event - send immediately, do NOT batch
         this.socket.emit('collectPowerUp', { powerUpId });
     }
     
