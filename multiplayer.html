@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BombSquad Multiplayer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="ui-overlay">
+            <div class="player-stats">
+                <div class="player-stat" id="player1-stat">
+                    <span class="player-name">Player 1</span>
+                    <div class="health-bar">
+                        <div class="health-fill" id="player1-health"></div>
+                    </div>
+                    <span class="bombs-count" id="player1-bombs">Bombs: 1</span>
+                </div>
+                <div class="player-stat" id="player2-stat">
+                    <span class="player-name">Player 2</span>
+                    <div class="health-bar">
+                        <div class="health-fill" id="player2-health"></div>
+                    </div>
+                    <span class="bombs-count" id="player2-bombs">Bombs: 1</span>
+                </div>
+                <div class="player-stat" id="player3-stat" style="display: none;">
+                    <span class="player-name">Player 3</span>
+                    <div class="health-bar">
+                        <div class="health-fill" id="player3-health"></div>
+                    </div>
+                    <span class="bombs-count" id="player3-bombs">Bombs: 1</span>
+                </div>
+                <div class="player-stat" id="player4-stat" style="display: none;">
+                    <span class="player-name">Player 4</span>
+                    <div class="health-bar">
+                        <div class="health-fill" id="player4-health"></div>
+                    </div>
+                    <span class="bombs-count" id="player4-bombs">Bombs: 1</span>
+                </div>
+            </div>
+            <div class="game-info">
+                <div class="round-timer" id="round-timer">Time: 120</div>
+                <div class="game-status" id="game-status">Fight!</div>
+                <div class="network-status" id="network-status">Connected</div>
+            </div>
+        </div>
+        <div id="game-canvas"></div>
+        <div class="controls-info">
+            <div class="controls-panel">
+                <h3>Controls</h3>
+                <div class="control-group">
+                    <strong>Move:</strong> WASD or Arrow Keys
+                </div>
+                <div class="control-group">
+                    <strong>Bomb:</strong> Space or Enter
+                </div>
+                <div class="control-group">
+                    <strong>Your Player:</strong> <span id="your-player-id">1</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="connection-overlay" id="connection-overlay">
+        <div class="connection-content">
+            <h2>Connecting to Game...</h2>
+            <div class="loading"></div>
+            <p id="connection-message">Establishing connection...</p>
+        </div>
+    </div>
+
+    <div class="game-over-overlay" id="game-over-overlay" style="display: none;">
+        <div class="game-over-content">
+            <h2 id="winner-text">Player 1 Wins!</h2>
+            <button class="menu-btn" onclick="returnToLobby()">Return to Lobby</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="phaser.js"></script>
+    <script src="networkManager.js"></script>
+    <script src="multiplayerPlayer.js"></script>
+    <script src="multiplayerBomb.js"></script>
+    <script src="multiplayerPowerup.js"></script>
+    <script src="multiplayerGame.js"></script>
+</body>
+</html>
