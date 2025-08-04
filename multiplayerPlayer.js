@@ -4,7 +4,7 @@ class MultiplayerPlayer {
         this.playerId = playerId;
         this.isLocal = isLocal;
         this.maxHealth = 100;
-        this.networkUpdateRate = 1000 / 20; // 20 updates per second for better responsiveness
+        this.networkUpdateRate = 1000 / 30; // 30 updates per second for better responsiveness
         this.lastNetworkUpdate = 0;
         
         // Initialize from server data
