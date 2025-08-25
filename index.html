@@ -49,16 +49,16 @@
             <div class="controls-panel">
                 <h3>Controls</h3>
                 <div class="control-group">
-                    <strong>Player 1:</strong> WASD to move, Space to bomb
+                    <strong>Player 1:</strong> WASD to move, Q to cycle weapons, Space to fire weapon, E to place bombs, F to detonate bombs
                 </div>
                 <div class="control-group">
-                    <strong>Player 2:</strong> Arrow keys to move, Enter to bomb
+                    <strong>Player 2:</strong> Arrow keys to move, Shift to cycle weapons, Enter to fire weapon, Ctrl to place bombs, Numpad Enter to detonate bombs
                 </div>
                 <div class="control-group">
-                    <strong>Player 3:</strong> IJKL to move, U to bomb
+                    <strong>Player 3:</strong> IJKL to move, O to cycle weapons, U to fire weapon, P to place bombs, H to detonate bombs
                 </div>
                 <div class="control-group">
-                    <strong>Player 4:</strong> Numpad 8456 to move, Numpad 0 to bomb
+                    <strong>Player 4:</strong> Numpad 8456 to move, Numpad 1 to cycle weapons, Numpad 0 to fire weapon, Numpad 3 to place bombs, Numpad + to detonate bombs
                 </div>
             </div>
         </div>
@@ -75,8 +75,22 @@
             </div>
             <div class="menu-instructions">
                 <p>Last player standing wins!</p>
-                <p>Collect power-ups to gain advantages</p>
+                <p>Collect power-ups and weapons to gain advantages</p>
+                <p>Use shields, teleport, and special weapons to survive!</p>
                 <p>Avoid explosions and knock out opponents</p>
+                <div class="trail-options">
+                    <h4>Trail Effects</h4>
+                    <button class="trail-btn" onclick="setTrailsForAllPlayers('sparkle')">✨ Sparkle</button>
+                    <button class="trail-btn" onclick="setTrailsForAllPlayers('neon')">🌟 Neon</button>
+                    <button class="trail-btn" onclick="setTrailsForAllPlayers('fire')">🔥 Fire</button>
+                    <button class="trail-btn" onclick="setTrailsForAllPlayers('lightning')">⚡ Lightning</button>
+                    <button class="trail-btn" onclick="setTrailsForAllPlayers('rainbow')">🌈 Rainbow</button>
+                    <button class="trail-btn" onclick="setTrailsForAllPlayers('shadow')">👤 Shadow</button>
+                    <button class="trail-btn" onclick="setTrailsForAllPlayers('plasma')">💫 Plasma</button>
+                </div>
+                <div class="zoom-options">
+                    <p><em>Dynamic zoom enabled - zooms out when moving for better map view</em></p>
+                </div>
             </div>
         </div>
     </div>
@@ -90,6 +104,9 @@
     </div>
 
     <script src="phaser.js"></script>
+    <script src="weapon.js"></script>
+    <script src="playerTrails.js"></script>
+    <script src="cameraZoom.js"></script>
     <script src="player.js"></script>
     <script src="bomb.js"></script>
     <script src="powerup.js"></script>
@@ -98,6 +115,41 @@
         function playOnline() {
             window.location.href = 'lobby.html?autoConnect=true';
         }
+        
+        function setTrailsForAllPlayers(trailType) {
+            // This will be called when the game is running
+            if (gameScene && gameScene.players && Array.isArray(gameScene.players)) {
+                // Filter out null/undefined players before iteration
+                const validPlayers = gameScene.players.filter(player => 
+                    player && 
+                    player.setTrailType
+                );
+                
+                validPlayers.forEach(player => {
+                    player.setTrailType(trailType);
+                });
+            }
+            
+            // Store preference for new games
+            localStorage.setItem('preferredTrailType', trailType);
+            
+            // Update button states
+            document.querySelectorAll('.trail-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+        
+        
+        // Load preferred settings on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set preferred trail type
+            const preferredTrail = localStorage.getItem('preferredTrailType') || 'sparkle';
+            const trailButton = document.querySelector(`[onclick*="${preferredTrail}"]`);
+            if (trailButton) {
+                trailButton.classList.add('active');
+            }
+        });
     </script>
 </body>
 </html>

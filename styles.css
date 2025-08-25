@@ -11,6 +11,90 @@ body {
     overflow: hidden;
 }
 
+/* Trail Selection Styles */
+.trail-options {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.trail-options h4 {
+    margin-bottom: 10px;
+    color: #ecf0f1;
+    font-size: 16px;
+}
+
+.trail-btn {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    border: none;
+    color: white;
+    padding: 8px 12px;
+    margin: 3px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.trail-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(135deg, #3498db, #2c3e50);
+}
+
+.trail-btn.active {
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    box-shadow: 0 0 15px rgba(231, 76, 60, 0.5);
+    transform: scale(1.05);
+}
+
+.trail-btn:active {
+    transform: scale(0.95);
+}
+
+/* Zoom Control Styles */
+.zoom-options {
+    margin-top: 15px;
+    text-align: center;
+}
+
+.zoom-options h4 {
+    margin-bottom: 8px;
+    color: #ecf0f1;
+    font-size: 16px;
+}
+
+.zoom-btn {
+    background: linear-gradient(135deg, #9b59b6, #8e44ad);
+    border: none;
+    color: white;
+    padding: 8px 12px;
+    margin: 3px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.zoom-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(135deg, #9b59b6, #2c3e50);
+}
+
+.zoom-btn.active {
+    background: linear-gradient(135deg, #e67e22, #d35400);
+    box-shadow: 0 0 15px rgba(230, 126, 34, 0.5);
+    transform: scale(1.05);
+}
+
+.zoom-btn:active {
+    transform: scale(0.95);
+}
+
 .game-container {
     position: relative;
     width: 100vw;

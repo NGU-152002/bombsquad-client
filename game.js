@@ -1,3 +1,35 @@
+// Utility function for safe array iteration - prevents null reference errors
+function safeArrayIteration(array, filterFn, callback) {
+    if (!array || !Array.isArray(array)) return;
+    
+    const validItems = array.filter(item => {
+        if (!item) return false;
+        return filterFn ? filterFn(item) : true;
+    });
+    
+    if (callback) {
+        validItems.forEach(callback);
+    }
+    
+    return validItems;
+}
+
+// Utility function to safely get valid game objects
+function getValidGameObjects(array, type = 'default') {
+    if (!array || !Array.isArray(array)) return [];
+    
+    const filters = {
+        players: item => item && item.isAlive && item.sprite && item.sprite.active,
+        blocks: item => item && item.x !== undefined && item.y !== undefined && item.active !== false && !item.destroyed,
+        projectiles: item => item && item.sprite && item.sprite.active && item.active,
+        bombs: item => item && item.sprite && item.sprite.active && !item.exploded,
+        powerUps: item => item && item.sprite && item.sprite.active && !item.collected,
+        default: item => item && (!item.sprite || item.sprite.active)
+    };
+    
+    return array.filter(filters[type] || filters.default);
+}
+
 // Game configuration
 const config = {
     type: Phaser.AUTO,
@@ -23,6 +55,7 @@ const config = {
 let game;
 let gameScene;
 let powerUpManager;
+let cameraZoomManager;
 let gameState = 'MENU';
 let roundTimer = 120; // 2 minutes
 let playerCount = 2;
@@ -40,6 +73,47 @@ function preload() {
     
     // Create simple textures for sprites if needed
     this.load.image('player', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==');
+    
+    // Create shotgun weapon sprites
+    createShotgunSprites.call(this);
+}
+
+function createShotgunSprites() {
+    // Create shotgun idle sprite (brown/dark grey barrel)
+    const shotgunGraphics = this.add.graphics();
+    shotgunGraphics.fillStyle(0x4a4a4a); // Dark grey barrel
+    shotgunGraphics.fillRoundedRect(0, 6, 40, 8, 2); // Main barrel
+    shotgunGraphics.fillStyle(0x8B4513); // Brown wood stock
+    shotgunGraphics.fillRoundedRect(35, 4, 15, 12, 3); // Stock
+    shotgunGraphics.fillStyle(0x2f2f2f); // Darker trigger area
+    shotgunGraphics.fillRoundedRect(25, 8, 8, 6, 1); // Trigger guard
+    shotgunGraphics.generateTexture('shotgun_idle', 55, 20);
+    shotgunGraphics.destroy();
+    
+    // Create shotgun firing sprite (with muzzle flash)
+    const shotgunFireGraphics = this.add.graphics();
+    shotgunFireGraphics.fillStyle(0x4a4a4a); // Dark grey barrel
+    shotgunFireGraphics.fillRoundedRect(5, 6, 40, 8, 2); // Main barrel (shifted back)
+    shotgunFireGraphics.fillStyle(0x8B4513); // Brown wood stock
+    shotgunFireGraphics.fillRoundedRect(40, 4, 15, 12, 3); // Stock
+    shotgunFireGraphics.fillStyle(0x2f2f2f); // Darker trigger area
+    shotgunFireGraphics.fillRoundedRect(30, 8, 8, 6, 1); // Trigger guard
+    // Muzzle flash
+    shotgunFireGraphics.fillStyle(0xFFFF88); // Bright yellow flash
+    shotgunFireGraphics.fillCircle(2, 10, 8); // Main flash
+    shotgunFireGraphics.fillStyle(0xFFAA00); // Orange inner flash
+    shotgunFireGraphics.fillCircle(2, 10, 5); // Inner flash
+    shotgunFireGraphics.fillStyle(0xFF6600); // Red core
+    shotgunFireGraphics.fillCircle(2, 10, 2); // Core flash
+    shotgunFireGraphics.generateTexture('shotgun_fire', 60, 20);
+    shotgunFireGraphics.destroy();
+    
+    // Create shotgun pellet sprite
+    const pelletGraphics = this.add.graphics();
+    pelletGraphics.fillStyle(0xFFDD44); // Golden pellet
+    pelletGraphics.fillCircle(2, 2, 2);
+    pelletGraphics.generateTexture('shotgun_pellet', 4, 4);
+    pelletGraphics.destroy();
 }
 
 function create() {
@@ -50,6 +124,9 @@ function create() {
     this.bombs = [];
     this.powerUps = [];
     this.destructibleBlocks = [];
+    this.projectiles = [];
+    this.flames = [];
+    this.meleeAttacks = [];
     
     // Create arena boundaries
     createArena(this);
@@ -60,43 +137,60 @@ function create() {
     // Initialize power-up manager
     powerUpManager = new PowerUpManager(this);
     
+    // Initialize camera zoom manager
+    cameraZoomManager = new CameraZoomManager(this, this.cameras.main);
+    
+    // Use simple zoom settings - no presets needed
+    
     // Start with menu
     showMenu();
 }
 
 function update(time, delta) {
-    if (gameState !== 'PLAYING') return;
+    if (gameState !== 'PLAYING' && gameState !== 'INITIALIZING') return;
     
     // Update players with error recovery
     if (gameScene.players) {
-        // Filter out any null/invalid players
-        gameScene.players = gameScene.players.filter(player => player && player.sprite);
+        // Only filter out completely null players, not ones with temporarily missing sprites
+        gameScene.players = gameScene.players.filter(player => player !== null && player !== undefined);
         
-        gameScene.players.forEach(player => {
-            if (player && player.isAlive && player.sprite) {
-                try {
-                    player.update();
+        // Filter out null/undefined players before iteration
+        const validPlayers = gameScene.players.filter(player => 
+            player && 
+            player.isAlive && 
+            player.sprite && 
+            player.sprite.active
+        );
+        
+        validPlayers.forEach(player => {
+            try {
+                player.update(time, delta);
+                
+                // Check power-up collisions with error recovery
+                if (gameScene.powerUps) {
+                    // Filter out invalid power-ups
+                    gameScene.powerUps = gameScene.powerUps.filter(powerUp => 
+                        powerUp && !powerUp.collected && powerUp.sprite
+                    );
                     
-                    // Check power-up collisions with error recovery
-                    if (gameScene.powerUps) {
-                        // Filter out invalid power-ups
-                        gameScene.powerUps = gameScene.powerUps.filter(powerUp => 
-                            powerUp && !powerUp.collected && powerUp.sprite
-                        );
-                        
-                        gameScene.powerUps.forEach(powerUp => {
-                            if (powerUp && !powerUp.collected && powerUp.sprite) {
-                                powerUp.checkCollision(player);
-                            }
-                        });
-                    }
-                } catch (error) {
-                    console.warn('Player update error:', error);
-                    // Remove problematic player
-                    const index = gameScene.players.indexOf(player);
-                    if (index > -1) {
-                        gameScene.players.splice(index, 1);
-                    }
+                    // Filter out null/undefined powerUps before iteration
+                    const validPowerUps = gameScene.powerUps.filter(powerUp => 
+                        powerUp && 
+                        !powerUp.collected && 
+                        powerUp.sprite && 
+                        powerUp.sprite.active
+                    );
+                    
+                    validPowerUps.forEach(powerUp => {
+                        powerUp.checkCollision(player);
+                    });
+                }
+            } catch (error) {
+                console.warn('Player update error:', error);
+                // Remove problematic player
+                const index = gameScene.players.indexOf(player);
+                if (index > -1) {
+                    gameScene.players.splice(index, 1);
                 }
             }
         });
@@ -107,11 +201,62 @@ function update(time, delta) {
         powerUpManager.update(delta);
     }
     
+    // Update camera zoom manager
+    if (cameraZoomManager && gameState === 'PLAYING') {
+        cameraZoomManager.update(time, delta);
+    }
+    
+    // Update projectiles
+    if (gameScene.projectiles) {
+        gameScene.projectiles = gameScene.projectiles.filter(projectile => {
+            if (projectile && projectile.active) {
+                projectile.update(delta);
+                return true;
+            }
+            return false;
+        });
+    }
+    
+    // Update bombs (for trajectory movement)
+    if (gameScene.bombs) {
+        // Filter out null/undefined bombs before iteration
+        const validBombs = gameScene.bombs.filter(bomb => 
+            bomb && 
+            bomb.update && 
+            bomb.sprite && 
+            bomb.sprite.active
+        );
+        
+        validBombs.forEach(bomb => {
+            bomb.update(delta);
+        });
+    }
+    
+    // Update flames
+    if (gameScene.flames) {
+        gameScene.flames = gameScene.flames.filter(flame => {
+            if (flame && flame.active) {
+                flame.update(delta);
+                return true;
+            }
+            return false;
+        });
+    }
+    
+    // Update melee attacks
+    if (gameScene.meleeAttacks) {
+        gameScene.meleeAttacks = gameScene.meleeAttacks.filter(attack => {
+            return attack && attack.active;
+        });
+    }
+    
     // Update round timer
     updateRoundTimer(delta);
     
-    // Check win condition
-    checkWinCondition();
+    // Check win condition only when game is actually playing
+    if (gameState === 'PLAYING') {
+        checkWinCondition();
+    }
 }
 
 function createArena(scene) {
@@ -197,7 +342,7 @@ function createDestructibleBlocks(scene) {
 
 function startGame(numPlayers) {
     playerCount = numPlayers;
-    gameState = 'PLAYING';
+    gameState = 'INITIALIZING'; // Prevent early win condition checks
     roundTimer = 120;
     
     hideMenu();
@@ -208,6 +353,12 @@ function startGame(numPlayers) {
     
     // Create players
     createPlayers(gameScene, numPlayers);
+    
+    // Set game state to playing after a brief delay to ensure all players are initialized
+    gameScene.time.delayedCall(200, () => {
+        gameState = 'PLAYING';
+        console.log(`Game started with ${numPlayers} players`);
+    });
     
     // Show player stats
     for (let i = 1; i <= 4; i++) {
@@ -226,11 +377,13 @@ function startGame(numPlayers) {
 
 function createPlayers(scene, numPlayers) {
     const { width, height } = scene.game.config;
+    // Spawn positions aligned to 144px grid with proper margins
+    const gridSize = 144;
     const spawnPositions = [
-        { x: 64, y: 64 },
-        { x: width - 64, y: 64 },
-        { x: 64, y: height - 64 },
-        { x: width - 64, y: height - 64 }
+        { x: gridSize * 2, y: gridSize * 2 }, // Top-left: 288, 288
+        { x: gridSize * 5, y: gridSize * 2 }, // Top-right: 720, 288  
+        { x: gridSize * 2, y: gridSize * 4 }, // Bottom-left: 288, 576
+        { x: gridSize * 5, y: gridSize * 4 }  // Bottom-right: 720, 576
     ];
     
     scene.players = [];
@@ -271,11 +424,16 @@ function updateRoundTimer(delta) {
 }
 
 function checkWinCondition() {
-    if (!gameScene.players) return;
+    if (!gameScene.players || gameScene.players.length < 2) return;
     
-    const alivePlayers = gameScene.players.filter(p => p && p.isAlive);
+    // Don't check win condition immediately after game start
+    if (roundTimer > 118) return; // Give 2 seconds grace period
     
-    if (alivePlayers.length <= 1) {
+    const alivePlayers = gameScene.players.filter(p => p && p.isAlive && p.sprite);
+    
+    // Only trigger game over if we actually have fewer alive players than we started with
+    // and at least one frame has passed with all players properly initialized
+    if (alivePlayers.length <= 1 && alivePlayers.length < playerCount) {
         gameState = 'GAME_OVER';
         
         let winnerText = 'Draw!';
@@ -299,31 +457,81 @@ function checkWinCondition() {
 }
 
 function cleanupGame() {
-    if (gameScene.players) {
-        gameScene.players.forEach(player => {
-            if (player && player.destroy) {
-                player.destroy();
-            }
+    if (gameScene.players && Array.isArray(gameScene.players)) {
+        // Filter out null/undefined players before iteration
+        const validPlayers = gameScene.players.filter(player => 
+            player && 
+            player.destroy
+        );
+        
+        validPlayers.forEach(player => {
+            player.destroy();
         });
+        
         gameScene.players = [];
     }
     
-    if (gameScene.bombs) {
-        gameScene.bombs.forEach(bomb => {
-            if (bomb && bomb.destroy) {
-                bomb.destroy();
-            }
+    if (gameScene.bombs && Array.isArray(gameScene.bombs)) {
+        // Filter out null/undefined bombs before iteration
+        const validBombs = gameScene.bombs.filter(bomb => 
+            bomb && 
+            bomb.destroy
+        );
+        
+        validBombs.forEach(bomb => {
+            bomb.destroy();
         });
+        
         gameScene.bombs = [];
     }
     
-    if (gameScene.powerUps) {
-        gameScene.powerUps.forEach(powerUp => {
-            if (powerUp && powerUp.destroy) {
-                powerUp.destroy();
+    if (gameScene.powerUps && Array.isArray(gameScene.powerUps)) {
+        // Filter out null/undefined powerUps before iteration
+        const validPowerUps = gameScene.powerUps.filter(powerUp => 
+            powerUp && 
+            powerUp.destroy
+        );
+        
+        validPowerUps.forEach(powerUp => {
+            powerUp.destroy();
+        });
+        
+        gameScene.powerUps = [];
+    }
+    
+    // Clean up projectiles
+    if (gameScene.projectiles && Array.isArray(gameScene.projectiles)) {
+        // Filter out null/undefined projectiles before iteration
+        const validProjectiles = gameScene.projectiles.filter(projectile => 
+            projectile && 
+            projectile.destroy
+        );
+        
+        validProjectiles.forEach(projectile => {
+            projectile.destroy();
+        });
+        
+        gameScene.projectiles = [];
+    }
+    
+    // Clean up flames
+    if (gameScene.flames) {
+        gameScene.flames.forEach(flame => {
+            if (flame && flame.destroy) {
+                flame.destroy();
             }
         });
-        gameScene.powerUps = [];
+        gameScene.flames = [];
+    }
+    
+    // Clean up melee attacks
+    if (gameScene.meleeAttacks) {
+        gameScene.meleeAttacks.forEach(attack => {
+            if (attack && attack.destroy) {
+                attack.destroy();
+            }
+        });
+        gameScene.meleeAttacks = [];
     }
     
     // Reset PowerUp manager
@@ -331,13 +539,23 @@ function cleanupGame() {
         powerUpManager.spawnTimer = 0;
     }
     
+    // Reset camera zoom
+    if (cameraZoomManager) {
+        cameraZoomManager.reset();
+    }
+    
     // Recreate destructible blocks for next game
-    if (gameScene.destructibleBlocks) {
-        gameScene.destructibleBlocks.forEach(block => {
-            if (block && block.destroy) {
-                block.destroy();
-            }
+    if (gameScene.destructibleBlocks && Array.isArray(gameScene.destructibleBlocks)) {
+        // Filter out null/undefined blocks before iteration
+        const validBlocks = gameScene.destructibleBlocks.filter(block => 
+            block && 
+            block.destroy
+        );
+        
+        validBlocks.forEach(block => {
+            block.destroy();
         });
+        
         gameScene.destructibleBlocks = [];
         createDestructibleBlocks(gameScene);
     }

@@ -9,7 +9,17 @@ class PowerUp {
             speed: { color: 0x3498db, symbol: 'S', name: 'Speed Boost' },
             bombs: { color: 0xe74c3c, symbol: 'B', name: 'Extra Bomb' },
             power: { color: 0xf39c12, symbol: 'P', name: 'Bomb Power' },
-            health: { color: 0x2ecc71, symbol: 'H', name: 'Health Pack' }
+            health: { color: 0x2ecc71, symbol: 'H', name: 'Health Pack' },
+            shield: { color: 0x9b59b6, symbol: 'D', name: 'Shield Generator' },
+            teleport: { color: 0x1abc9c, symbol: 'T', name: 'Teleporter' },
+            // Weapon pickups
+            grenade: { color: 0x8b4513, symbol: 'G', name: 'Grenade' },
+            rocket: { color: 0xff4500, symbol: 'R', name: 'Rocket Launcher' },
+            flamethrower: { color: 0xff6600, symbol: 'F', name: 'Flame Thrower' },
+            sword: { color: 0xc0c0c0, symbol: 'S', name: 'Sword' },
+            sniper: { color: 0x2c3e50, symbol: 'N', name: 'Sniper Rifle' },
+            shotgun: { color: 0x8b4513, symbol: 'H', name: 'Shotgun' },
+            lightning: { color: 0x9b59b6, symbol: 'L', name: 'Lightning Gun' }
         };
         
         const config = this.config[type];
@@ -260,8 +270,12 @@ class PowerUpManager {
     }
     
     spawnRandomPowerUp() {
-        const powerUpTypes = ['speed', 'bombs', 'power', 'health'];
-        const type = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
+        const powerUpTypes = ['speed', 'bombs', 'power', 'health', 'shield', 'teleport'];
+        const weaponTypes = ['grenade', 'rocket', 'flamethrower', 'sword', 'sniper', 'shotgun', 'lightning'];
+        
+        // 70% chance for regular power-up, 30% chance for weapon
+        const allTypes = Math.random() < 0.7 ? powerUpTypes : weaponTypes;
+        const type = allTypes[Math.floor(Math.random() * allTypes.length)];
         
         // Find a safe spawn location
         let attempts = 0;
@@ -280,24 +294,53 @@ class PowerUpManager {
     }
     
     isLocationOccupied(x, y) {
-        // Check if location is too close to players
-        for (let player of this.scene.players) {
-            if (player.isAlive) {
+        // Check if location is too close to players - filter out null/undefined players first
+        if (this.scene.players && Array.isArray(this.scene.players)) {
+            const validPlayers = this.scene.players.filter(player => 
+                player && 
+                player.isAlive && 
+                player.sprite && 
+                player.sprite.active &&
+                player.sprite.x !== undefined &&
+                player.sprite.y !== undefined
+            );
+            
+            for (let player of validPlayers) {
                 const distance = Phaser.Math.Distance.Between(x, y, player.sprite.x, player.sprite.y);
                 if (distance < 80) return true;
             }
         }
         
-        // Check if location is too close to bombs
-        for (let bomb of this.scene.bombs) {
-            const distance = Phaser.Math.Distance.Between(x, y, bomb.sprite.x, bomb.sprite.y);
-            if (distance < 60) return true;
+        // Check if location is too close to bombs - filter out null/undefined bombs first
+        if (this.scene.bombs && Array.isArray(this.scene.bombs)) {
+            const validBombs = this.scene.bombs.filter(bomb => 
+                bomb && 
+                bomb.sprite && 
+                bomb.sprite.active &&
+                bomb.sprite.x !== undefined &&
+                bomb.sprite.y !== undefined
+            );
+            
+            for (let bomb of validBombs) {
+                const distance = Phaser.Math.Distance.Between(x, y, bomb.sprite.x, bomb.sprite.y);
+                if (distance < 60) return true;
+            }
         }
         
-        // Check if location is too close to destructible blocks
-        for (let block of this.scene.destructibleBlocks) {
-            const distance = Phaser.Math.Distance.Between(x, y, block.x, block.y);
-            if (distance < 60) return true;
+        // Check if location is too close to destructible blocks - filter out null/undefined blocks first
+        if (this.scene.destructibleBlocks && Array.isArray(this.scene.destructibleBlocks)) {
+            const validBlocks = this.scene.destructibleBlocks.filter(block => 
+                block && 
+                block.x !== undefined && 
+                block.y !== undefined && 
+                block.active !== false &&
+                !block.destroyed
+            );
+            
+            for (let block of validBlocks) {
+                const distance = Phaser.Math.Distance.Between(x, y, block.x, block.y);
+                if (distance < 60) return true;
+            }
         }
         
         return false;
